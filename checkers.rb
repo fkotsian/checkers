@@ -333,6 +333,8 @@ b[ [3,2] ].perform_moves([ [5,0] ])
 puts
 b.display
 
+# comment for 2nd half of commits
+
 # b.move_piece( [3,2] )
 # puts
 # b.display
