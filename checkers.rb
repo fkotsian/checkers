@@ -14,34 +14,106 @@ class Piece
     @king = false
   end
 
-  def perform_moves!(move_seq)
+  def perform_moves(move_seq)
+    if valid_move_seq?(move_seq)
+      perform_moves!(move_seq)
+    else
+      raise InvalidMoveError.new "One or more of your moves are invalid!"
+    end
+  end
+
+  def valid_move_seq?(move_seq)
+    duped_board = self.board.dup
+    duped_piece = duped_board[ self.pos ]
+
+    begin
+      duped_piece.perform_moves!(move_seq)
+    rescue InvalidMoveError => e
+      puts e
+      false
+    else
+      true
+    end
 
   end
 
-  def perform_slide(pos)
-    #remove from the original spot
-    curr_piece_loc = self.pos
-    self.board[ curr_piece_loc ] = nil
+  def perform_moves!(move_seq)
+    if move_seq.empty? || move_seq.nil?
+      raise InvalidMoveError.new "No moves to make!"
 
-    # update position and (optionally) add it to the new spot
-    self.pos = pos
-    self.board[ self.pos ] = self
-    self
+    elsif move_seq.one?
+      to = move_seq.first
+      if perform_slide(to)
+      elsif perform_jump(to)
+      else
+        raise InvalidMoveError.new "Can't move there!"
+      end
+
+    else    # is multiple moves long
+      to = move_seq.first
+      if perform_jump(to)
+        perform_moves!( move_seq[1..-1] )
+      end
+
+    end
+  end
+
+  # def make_move(to)
+  #   # if from and to are 2 away
+  #   # curr_piece = self
+  #   if valid_slides.include?(to)
+  #     p "Curr slide is: #{valid_slides.include?(to) }"
+  #     # self[to] =
+  #     perform_slide(to)
+  #
+  #   elsif curr_piece.valid_jumps.include?(to)
+  #     p "Curr jump is: #{valid_jumps.include?(to) }"
+  #     # self[to] =
+  #     perform_jump(to)
+  #
+  #   else
+  #     raise InvalidMoveError.new "Can't move there!"
+  #
+  #   end
+  #   maybe_promote
+  # end
+
+  def perform_slide(pos)
+
+    if valid_slides.include?(pos)
+      #remove from the original spot
+      curr_piece_loc = self.pos
+      self.board[ curr_piece_loc ] = nil
+
+      # update position and (optionally) add it to the new spot
+      self.pos = pos
+      self.board[ self.pos ] = self
+      true
+    else
+      false
+    end
+
   end
 
   def perform_jump(pos)
-    # remove from the original spot
-    start_piece_loc = self.pos
-    self.board[ start_piece_loc ] = nil
 
-    # remove jumped piece
-    jumped_piece_loc = find_jumped_square(start_piece_loc, pos)
-    self.board[ jumped_piece_loc ] = nil
+    if valid_jumps.include?(pos)
+      # remove from the original spot
+      start_piece_loc = self.pos
+      self.board[ start_piece_loc ] = nil
 
-    # update position and (optionally) add it to the new spot
-    self.pos = pos
-    self.board[ self.pos ] = self
-    self
+      # remove jumped piece
+      jumped_piece_loc = find_jumped_square(start_piece_loc, pos)
+      self.board[ jumped_piece_loc ] = nil
+
+      # update position and (optionally) add it to the new spot
+      self.pos = pos
+      self.board[ self.pos ] = self
+      true
+    else
+      false
+    end
+
   end
 
   def valid_slides
@@ -111,6 +183,12 @@ class Piece
       -1
     end
   end
+
+  def dup(new_board)
+    Piece.new( self.pos, new_board, self.color )
+  end
+
+
 end
 
 class Board
@@ -120,7 +198,6 @@ class Board
     @grid = Array.new(8) { Array.new(8) }
 
     setup_board if setup
-    display
   end
 
   def display
@@ -140,25 +217,25 @@ class Board
     puts "  0 1 2 3 4 5 6 7"
   end
 
-  def move_piece(from, to)
-    # if from and to are 2 away
-    curr_piece = self[from]
-    if curr_piece.valid_slides.include?(to)
-      p "Curr slide is: #{curr_piece.valid_slides.include?(to) }"
-      # self[to] =
-      curr_piece.perform_slide(to)
-
-    elsif curr_piece.valid_jumps.include?(to)
-      p "Curr jump is: #{curr_piece.valid_jumps.include?(to) }"
-      # self[to] =
-      curr_piece.perform_jump(to)
-
-    else
-      raise InvalidMoveError.new "Can't move there!"
-
-    end
-    curr_piece.maybe_promote
-  end
+  # def move_piece(from, to)
+  #   # if from and to are 2 away
+  #   curr_piece = self[from]
+  #   if curr_piece.valid_slides.include?(to)
+  #     p "Curr slide is: #{curr_piece.valid_slides.include?(to) }"
+  #     # self[to] =
+  #     curr_piece.perform_slide(to)
+  #
+  #   elsif curr_piece.valid_jumps.include?(to)
+  #     p "Curr jump is: #{curr_piece.valid_jumps.include?(to) }"
+  #     # self[to] =
+  #     curr_piece.perform_jump(to)
+  #
+  #   else
+  #     raise InvalidMoveError.new "Can't move there!"
+  #
+  #   end
+  #   curr_piece.maybe_promote
+  # end
 
   def place_piece(pos, piece)
     self[pos] = piece
@@ -180,6 +257,18 @@ class Board
     pos_x, pos_y = pos
     self.grid[pos_x][pos_y].nil?
   end
+
+  def dup
+    new_board = Board.new(false)
+    pieces = self.grid.flatten.compact
+
+    for piece in pieces
+      duped_piece = piece.dup(new_board)
+      new_board[duped_piece.pos] = duped_piece
+    end
+    new_board
+  end
+
 
 
   protected
@@ -231,15 +320,16 @@ end
 # end
 
 b = Board.new
-b.move_piece( [2,1], [3,2] )
+b.display
+b[ [2,1] ].perform_moves([ [3,2] ])
 puts
 b.display
 
-b.move_piece( [5,0], [4,1] )
+b[ [5,0] ].perform_moves([ [4,1] ])
 puts
 b.display
 
-b.move_piece( [3,2], [5,0] )
+b[ [3,2] ].perform_moves([ [5,0] ])
 puts
 b.display
 
