@@ -260,15 +260,21 @@ class Board
 
   def dup
     new_board = Board.new(false)
-    pieces = self.grid.flatten.compact
 
-    for piece in pieces
+    for piece in self.pieces
       duped_piece = piece.dup(new_board)
       new_board[duped_piece.pos] = duped_piece
     end
     new_board
   end
 
+  def pieces_of_color(color)
+    self.pieces.select { |piece| piece.color == color }
+  end
+
+  def pieces
+    self.grid.flatten.compact
+  end
 
 
   protected
@@ -305,61 +311,87 @@ end
 class InvalidMoveError < StandardError
 end
 
-# class Game
-#
-#   def initialize
-#     b = Board.new
-#
-#     play_turns
-#   end
-#
-#   def play_turns
-#     puts "Red, what piece do you want to move [row, col]"
-#   end
-#
-# end
+class Game
+  attr_accessor :turn. :checkerboard
 
-b = Board.new
-b.display
-b[ [2,1] ].perform_moves([ [3,2] ])
-puts
-b.display
+  def initialize
+    @checkerboard = Board.new
+    @turn = :red
 
-b[ [5,0] ].perform_moves([ [4,1] ])
-puts
-b.display
+    play_game
+  end
 
-b[ [3,2] ].perform_moves([ [5,0] ])
-puts
-b.display
+  def play_game
+    until self.checkerboard.pieces_of_color(turn).empty?
+      play_turn(self.turn)
+      switch_turns
+    end
 
-# comment for 2nd half of commits
+    puts "Game over! #{turn} has no pieces left. #{opposite_turn} wins!"
+  end
 
-# b.move_piece( [3,2] )
+  def play_turn(color)
+    move_seq = []
+
+    begin
+      from = ""
+      to = ""
+
+      puts "#{turn}, enter your moves. (row, col), 'n' to stop: "
+      puts "#{turn}, what piece do you want to move? "
+      from = gets.chomp
+      from = from.split(',').map(&:strip).map(&:to_i)
+
+      puts "to? "
+
+      until to.downcase.strip == [0] || to == [] || to.downcase.strip == "n"
+        to = gets.chomp
+        # unless to == "n"
+        to = to.split(',').map(&:strip).map(&:to_i)
+        move_seq << to
+        puts "Do you want to jump again? ('n' for 'No')"
+        # end
+      end
+
+      selected_piece = self.checkerboard[from]
+      self.checkerboard.perform_moves( move_seq )
+    rescue InvalidMoveError => e
+      puts e
+      retry
+    end
+
+  end
+
+  def switch_turns
+    self.turn = opposite_turn
+  end
+
+  def opposite_turn
+    if self.turn = :red
+      :white
+    else
+      :red
+    end
+  end
+
+
+end
+
+# b = Board.new
+# b.display
+# b[ [2,1] ].perform_moves([ [3,2] ])
 # puts
 # b.display
 #
-# b.move_piece( [2,1], [3,2] )
+# b[ [5,0] ].perform_moves([ [4,1] ])
 # puts
 # b.display
 #
-# b.move_piece( [2,1], [3,2] )
+# b[ [3,2] ].perform_moves([ [5,0] ])
 # puts
 # b.display
-#
-#
-#
-#
 
-
-
-
-
-
-
-
-
-
+g = Game.new
 
 
 
