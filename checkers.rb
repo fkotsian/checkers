@@ -29,7 +29,7 @@ class Piece
     begin
       duped_piece.perform_moves!(move_seq)
     rescue InvalidMoveError => e
-      puts e
+      # puts e
       false
     else
       true
@@ -54,32 +54,10 @@ class Piece
       if perform_jump(to)
         perform_moves!( move_seq[1..-1] )
       end
-
     end
   end
 
-  # def make_move(to)
-  #   # if from and to are 2 away
-  #   # curr_piece = self
-  #   if valid_slides.include?(to)
-  #     p "Curr slide is: #{valid_slides.include?(to) }"
-  #     # self[to] =
-  #     perform_slide(to)
-  #
-  #   elsif curr_piece.valid_jumps.include?(to)
-  #     p "Curr jump is: #{valid_jumps.include?(to) }"
-  #     # self[to] =
-  #     perform_jump(to)
-  #
-  #   else
-  #     raise InvalidMoveError.new "Can't move there!"
-  #
-  #   end
-  #   maybe_promote
-  # end
-
   def perform_slide(pos)
-
     if valid_slides.include?(pos)
       #remove from the original spot
       curr_piece_loc = self.pos
@@ -92,11 +70,9 @@ class Piece
     else
       false
     end
-
   end
 
   def perform_jump(pos)
-
     if valid_jumps.include?(pos)
       # remove from the original spot
       start_piece_loc = self.pos
@@ -113,14 +89,13 @@ class Piece
     else
       false
     end
-
   end
 
   def valid_slides
     diffs = move_diffs_in_direction
     diffs.map do |diff|
       new_pos = get_new_pos(diff)
-      if self.board.empty?(new_pos)
+      if self.board.empty?(new_pos) && within_boundaries?(new_pos)
         new_pos
       else
         nil
@@ -132,13 +107,17 @@ class Piece
     diffs = move_diffs_in_direction
     diffs.map do |diff|
       possibly_occupied_pos = get_new_pos(diff)
-      if not self.board.empty?(possibly_occupied_pos)
-        #generate new position
-        get_new_pos( diff.map { |coord| coord * 2 } )
+      new_pos = get_new_pos( diff.map { |coord| coord * 2 } )
+      if not self.board.empty?(possibly_occupied_pos) && within_boundaries?(new_pos)
+        new_pos
       else
         nil
       end
     end
+  end
+
+  def has_valid_jumps?
+    !self.valid_jumps.all?(&:nil?)
   end
 
   def maybe_promote
@@ -153,6 +132,12 @@ class Piece
   def get_new_pos(diff)
     [ self.pos.first + diff.first,
       self.pos.last  + diff.last   ]
+  end
+
+  def within_boundaries?(pos)
+    pos_x, pos_y = pos
+    ( pos_x.between?(0, self.board.grid.length) &&
+      pos_y.between?(0, self.board.grid.first.length) )
   end
 
   def move_diffs_in_direction
@@ -217,26 +202,6 @@ class Board
     puts "  0 1 2 3 4 5 6 7"
   end
 
-  # def move_piece(from, to)
-  #   # if from and to are 2 away
-  #   curr_piece = self[from]
-  #   if curr_piece.valid_slides.include?(to)
-  #     p "Curr slide is: #{curr_piece.valid_slides.include?(to) }"
-  #     # self[to] =
-  #     curr_piece.perform_slide(to)
-  #
-  #   elsif curr_piece.valid_jumps.include?(to)
-  #     p "Curr jump is: #{curr_piece.valid_jumps.include?(to) }"
-  #     # self[to] =
-  #     curr_piece.perform_jump(to)
-  #
-  #   else
-  #     raise InvalidMoveError.new "Can't move there!"
-  #
-  #   end
-  #   curr_piece.maybe_promote
-  # end
-
   def place_piece(pos, piece)
     self[pos] = piece
   end
@@ -247,7 +212,7 @@ class Board
   end
 
   def []=(pos, piece)
-    raise "Invalid position" unless valid_pos?(pos)
+    raise InvalidMoveError.new "Invalid position" unless valid_pos?(pos)
 
     pos_x, pos_y = pos
     self.grid[pos_x][pos_y] = piece
@@ -276,7 +241,6 @@ class Board
     self.grid.flatten.compact
   end
 
-
   protected
   def setup_board
     (0..2).each do |row|
@@ -295,45 +259,43 @@ class Board
 
       new_piece = Piece.new(curr_pos, self, color)
       place_piece(curr_pos, new_piece)
-      # else
-      #   self[ [row, col] ] = nil
-      # end
     end
   end
 
   def valid_pos?(pos)
     pos.all? { |coord| coord.between?(0, self.grid.length) }
   end
-
-
 end
 
-class InvalidMoveError < StandardError
-end
+class InvalidMoveError < StandardError; end
 
 class Game
-  attr_accessor :turn. :checkerboard
+  attr_accessor :turn, :checkerboard
 
   def initialize
     @checkerboard = Board.new
     @turn = :red
 
+    display_board
     play_game
   end
 
   def play_game
     until self.checkerboard.pieces_of_color(turn).empty?
       play_turn(self.turn)
+      puts
+      display_board
+      puts
       switch_turns
     end
 
-    puts "Game over! #{turn} has no pieces left. #{opposite_turn} wins!"
+    puts "Game over! #{turn} has no pieces left. #{self.opposite_turn} wins!"
   end
 
   def play_turn(color)
-    move_seq = []
 
     begin
+      move_seq = []
       from = ""
       to = ""
 
@@ -343,23 +305,44 @@ class Game
       from = from.split(',').map(&:strip).map(&:to_i)
 
       puts "to? "
-
-      until to.downcase.strip == [0] || to == [] || to.downcase.strip == "n"
-        to = gets.chomp
-        # unless to == "n"
-        to = to.split(',').map(&:strip).map(&:to_i)
-        move_seq << to
-        puts "Do you want to jump again? ('n' for 'No')"
-        # end
-      end
+      to = gets.chomp
+      to = to.split(',').map(&:strip).map(&:to_i)
+      move_seq << to
 
       selected_piece = self.checkerboard[from]
-      self.checkerboard.perform_moves( move_seq )
+
+      # see if was a jump, and exists another
+      p selected_piece.has_valid_jumps?
+      if made_jump?(from, to) && selected_piece.has_valid_jumps?
+        #prompt for next jump
+        loop do # to == [0] || to == [] #
+          puts "Do you want to jump again? (Enter [row, col] or 'n' for 'No'.)"
+          to = gets.chomp
+
+          # stop loop if got 'n' or empty input
+          break if to == "n" || to.strip == ""
+          to = to.split(',').map(&:strip).map(&:to_i)
+          move_seq << to
+        end
+      end
+
+      unless selected_piece.color != self.turn
+        selected_piece.perform_moves( move_seq )
+      else
+        raise InvalidMoveError.new "That's not your piece!"
+      end
+
     rescue InvalidMoveError => e
       puts e
       retry
     end
+    # rescue StandardError => e
+    #   puts "Not a valid move input!"
+    #   retry
+  end
 
+  def made_jump?(from, to)
+    ( from.first - to.first ).abs > 1 || ( from.last - to.last ).abs > 1
   end
 
   def switch_turns
@@ -367,29 +350,18 @@ class Game
   end
 
   def opposite_turn
-    if self.turn = :red
-      :white
+    if self.turn == :red
+      :black
     else
       :red
     end
   end
 
-
+  def display_board
+    self.checkerboard.display
+  end
 end
 
-# b = Board.new
-# b.display
-# b[ [2,1] ].perform_moves([ [3,2] ])
-# puts
-# b.display
-#
-# b[ [5,0] ].perform_moves([ [4,1] ])
-# puts
-# b.display
-#
-# b[ [3,2] ].perform_moves([ [5,0] ])
-# puts
-# b.display
 
 g = Game.new
 
